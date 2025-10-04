@@ -1,0 +1,6 @@
+﻿<widgets:HintGui
+    xmlns="https://spacestation14.io"
+    xmlns:graphics="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client"
+    xmlns:widgets="clr-namespace:Content.Client.UserInterface.Systems.InteractionHint.Widgets">
+    <Label Name="Interactions" VerticalAlignment="Top" />
+</widgets:HintGui>
