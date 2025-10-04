@@ -16,6 +16,13 @@ namespace Content.Client.UserInterface.Systems.InteractionHint.Widgets;
 
 public sealed class HintUiController : UIController, IOnSystemChanged<VerbSystem>
 {
+    public enum VerbType
+    {
+        Activate,
+        AltActivate,
+        Interact
+    }
+
     [Dependency] private readonly IInputManager _inputManager = default!;
     [Dependency] private readonly IStateManager _stateManager = default!;
     [Dependency] private readonly IUserInterfaceManager _uiManager = default!;
@@ -45,6 +52,7 @@ public sealed class HintUiController : UIController, IOnSystemChanged<VerbSystem
     {
         // Yoinked straight from InteractionOutlineSystem, which breaks the "Don’t copy paste code" convention
         // This *will* be changed... once I understand the codebase enough to make a "correct" implementation
+        // Also, since this is the same code for the outline system, it doesn't target items in your inventory
         var currentState = _stateManager.CurrentState;
         if (currentState is not GameplayStateBase screen)
             return;
@@ -68,15 +76,23 @@ public sealed class HintUiController : UIController, IOnSystemChanged<VerbSystem
         Gui?.UpdateHints(entityToClick);
     }
 
-    public Verb? GetAlternativeVerb(EntityUid? target)
+    public Verb? GetVerb(EntityUid? target, VerbType verbType)
     {
         if (_verbSystem == null)
             return null;
-        var localEntity = _playerManager.LocalEntity;
-        if (_entityManager.Deleted(target) || _entityManager.Deleted(localEntity))
+        var user = _playerManager.LocalEntity;
+        if (_entityManager.Deleted(target) || _entityManager.Deleted(user))
             return null;
 
-        var verbs = _verbSystem.GetLocalVerbs(target.Value, localEntity.Value, typeof(AlternativeVerb));
+        var verbs = verbType switch
+        {
+            VerbType.Activate => _verbSystem.GetLocalVerbs(target.Value, user.Value, typeof(ActivationVerb)),
+            VerbType.AltActivate => _verbSystem.GetLocalVerbs(target.Value, user.Value, typeof(AlternativeVerb)),
+            VerbType.Interact => _verbSystem.GetLocalVerbs(target.Value, user.Value,
+                new List<Type>() { typeof(InteractionVerb), typeof(ActivationVerb) }), // Interactions fallback to activations
+            _ => throw new ArgumentOutOfRangeException(nameof(verbType), verbType, null)
+        };
+
         if (verbs.Count == 0)
             return null;
 
