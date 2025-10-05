@@ -3,6 +3,8 @@ using Content.Client.Gameplay;
 using Content.Client.Hands.Systems;
 using Content.Client.Verbs;
 using Content.Client.Viewport;
+using Content.Shared.Hands.Components;
+using Content.Shared.Hands.EntitySystems;
 using Content.Shared.Verbs;
 using Robust.Client.Input;
 using Robust.Client.Player;
@@ -10,7 +12,10 @@ using Robust.Client.State;
 using Robust.Client.UserInterface;
 using Robust.Client.UserInterface.Controllers;
 using Robust.Client.UserInterface.CustomControls;
+using Robust.Shared.Containers;
 using Robust.Shared.Timing;
+using Robust.Shared.Utility;
+using TerraFX.Interop.Xlib;
 
 namespace Content.Client.UserInterface.Systems.InteractionHint.Widgets;
 
@@ -48,14 +53,14 @@ public sealed class HintUiController : UIController, IOnSystemChanged<VerbSystem
         _verbSystem = null;
     }
 
-    private void UpdateHints()
+    private EntityUid? GetHighlightedEntity()
     {
         // Yoinked straight from InteractionOutlineSystem, which breaks the "Don’t copy paste code" convention
         // This *will* be changed... once I understand the codebase enough to make a "correct" implementation
         // Also, since this is the same code for the outline system, it doesn't target items in your inventory
         var currentState = _stateManager.CurrentState;
         if (currentState is not GameplayStateBase screen)
-            return;
+            return null;
 
         EntityUid? entityToClick = null;
         if (_uiManager.CurrentlyHovered is IViewportControl vp
@@ -73,7 +78,27 @@ public sealed class HintUiController : UIController, IOnSystemChanged<VerbSystem
             }
         }
 
-        Gui?.UpdateHints(entityToClick);
+        return entityToClick;
+    }
+
+    private EntityUid? GetEntityInHand(EntityUid target)
+    {
+        if (!_entityManager.TryGetComponent<HandsComponent>(target, out var handsComp) ||
+            !_entityManager.TryGetComponent<ContainerManagerComponent>(target, out var containerComp) ||
+            handsComp.ActiveHandId == null ||
+            !containerComp.Containers.TryGetValue(handsComp.ActiveHandId, out var container))
+            return null;
+
+        return container.ContainedEntities.FirstOrNull();
+    }
+
+    private void UpdateHints()
+    {
+        var localEntity = _playerManager.LocalEntity;
+        if (_entityManager.Deleted(localEntity))
+            return;
+
+        Gui?.UpdateHints(GetHighlightedEntity(), GetEntityInHand(localEntity.Value));
     }
 
     public Verb? GetVerb(EntityUid? target, VerbType verbType)
